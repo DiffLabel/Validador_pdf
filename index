@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF Text Comparator</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    input[type=file] { margin-bottom: 10px; }
+    #result { white-space: pre-wrap; background: #f0f0f0; padding: 10px; border: 1px solid #ccc; }
+    .diff { color: red; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>PDF Text Comparator</h1>
+  <p>Select two PDF files to compare their text content:</p>
+  <input type="file" id="pdf1" accept="application/pdf" /> <br />
+  <input type="file" id="pdf2" accept="application/pdf" /> <br />
+  <button onclick="comparePDFs()">Compare</button>
+  <h3>Result:</h3>
+  <div id="result"></div>
+
+  <script>
+    async function extractTextFromPDF(file) {
+      const buffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+      let fullText = '';
+      for (let i = 1; i <= pdf.numPages; i++) {
+        const page = await pdf.getPage(i);
+        const content = await page.getTextContent();
+        fullText += content.items.map(item => item.str).join(' ') + '\n';
+      }
+      return fullText.trim();
+    }
+
+    async function comparePDFs() {
+      const file1 = document.getElementById('pdf1').files[0];
+      const file2 = document.getElementById('pdf2').files[0];
+      const resultDiv = document.getElementById('result');
+      resultDiv.innerHTML = 'Comparing...';
+
+      if (!file1 || !file2) {
+        resultDiv.textContent = 'Please upload both PDF files.';
+        return;
+      }
+
+      const [text1, text2] = await Promise.all([
+        extractTextFromPDF(file1),
+        extractTextFromPDF(file2)
+      ]);
+
+      if (text1 === text2) {
+        resultDiv.textContent = '✅ The PDFs are textually identical.';
+      } else {
+        resultDiv.innerHTML = '<strong>❌ Texts are different.</strong>\n\n';
+        const diffLines = generateDiff(text1, text2);
+        resultDiv.innerHTML += diffLines;
+      }
+    }
+
+    function generateDiff(a, b) {
+      const aLines = a.split('\n');
+      const bLines = b.split('\n');
+      const maxLen = Math.max(aLines.length, bLines.length);
+      let output = '';
+      for (let i = 0; i < maxLen; i++) {
+        const lineA = aLines[i] || '';
+        const lineB = bLines[i] || '';
+        if (lineA !== lineB) {
+          output += `\n<p><span class="diff">Page Line ${i+1}:</span><br>Original: ${lineA}<br>Prepared: ${lineB}</p>`;
+        }
+      }
+      return output;
+    }
+  </script>
+</body>
+</html>
